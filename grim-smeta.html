@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Грим-смета — планировщик бюджета грима</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#FAF8F4;
+    --surface:#FFFFFF;
+    --surface-2:#F3F0EA;
+    --border:#E9E4DC;
+    --text:#2B2730;
+    --text-soft:#7A7482;
+    --text-faint:#A6A0AB;
+    --accent:#5B4B8A;
+    --accent-soft:#EEEAF7;
+    --accent-hover:#4A3C74;
+    --ok:#6B8F71;
+    --ok-soft:#E9F1E9;
+    --warn:#B98A22;
+    --warn-soft:#FBF1DD;
+    --bad:#B5563C;
+    --bad-soft:#FBEBE6;
+    --info:#4F7FA8;
+    --info-soft:#E9F1F7;
+    --radius:14px;
+    --radius-sm:9px;
+    --shadow: 0 1px 2px rgba(43,39,48,0.04), 0 6px 20px rgba(43,39,48,0.06);
+    --shadow-sm: 0 1px 3px rgba(43,39,48,0.06);
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  body{font-size:14.5px;line-height:1.5;}
+  h1,h2,h3,h4{font-family:var(--sans);font-weight:650;margin:0;letter-spacing:-0.01em;}
+  button{font-family:var(--sans);cursor:pointer;}
+  input,select,textarea{font-family:var(--sans);font-size:14px;}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  #app{max-width:1080px;margin:0 auto;padding:20px 18px 80px;}
+  a{color:inherit;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:10px;background:conic-gradient(from 210deg, #5B4B8A, #B5789C, #C9A227, #6B8F71, #5B4B8A);box-shadow:var(--shadow-sm);}
+  .brand-text{display:flex;flex-direction:column;line-height:1.15;}
+  .brand-text b{font-size:15px;}
+  .brand-text span{font-size:11.5px;color:var(--text-soft);}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 14px;border-radius:10px;font-size:13.5px;font-weight:560;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;box-shadow:var(--shadow-sm);}
+  .btn:hover{border-color:#D8D2C8;transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);}
+  .btn-ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--text-soft);}
+  .btn-ghost:hover{background:var(--surface-2);transform:none;}
+  .btn-danger{color:var(--bad);}
+  .btn-sm{padding:5px 10px;font-size:12.5px;border-radius:8px;}
+  .btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;}
+  .icon-btn{width:30px;height:30px;padding:0;justify-content:center;border-radius:8px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;}
+  .card + .card{margin-top:14px;}
+  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:650;margin-bottom:10px;}
+
+  .tabs{display:flex;gap:6px;background:var(--surface-2);padding:5px;border-radius:12px;margin-bottom:18px;overflow-x:auto;}
+  .tab{border:none;background:transparent;padding:9px 15px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--text-soft);white-space:nowrap;display:flex;align-items:center;gap:6px;}
+  .tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm);}
+
+  .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+  .proj-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;}
+  .proj-card:hover{transform:translateY(-2px);box-shadow:0 4px 6px rgba(43,39,48,0.06),0 12px 28px rgba(43,39,48,0.09);}
+  .proj-card h3{font-size:15px;margin-bottom:4px;}
+  .proj-meta{color:var(--text-soft);font-size:12.5px;margin-bottom:10px;}
+  .proj-stage{display:inline-block;font-size:11px;font-weight:650;padding:3px 8px;border-radius:20px;}
+  .stage-draft{background:var(--warn-soft);color:var(--warn);}
+  .stage-work{background:var(--ok-soft);color:var(--ok);}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-soft);}
+  .empty-state .brand-mark{margin:0 auto 16px;width:52px;height:52px;border-radius:16px;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-soft);margin-bottom:5px;}
+  .field input[type=text], .field input[type=number], .field select, .field textarea{
+    width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:640px){.field-row,.field-row3{grid-template-columns:1fr;}}
+  .hint{font-size:12px;color:var(--text-faint);margin-top:4px;}
+  .yn-toggle{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;width:fit-content;}
+  .yn-toggle button{border:none;background:var(--surface);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-soft);border-right:1px solid var(--border);}
+  .yn-toggle button:last-child{border-right:none;}
+  .yn-toggle button.active{background:var(--accent-soft);color:var(--accent);}
+
+  .cat-block{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;background:var(--surface);}
+  .cat-head{display:flex;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;flex-wrap:wrap;}
+  .cat-dot{width:11px;height:11px;border-radius:4px;flex-shrink:0;}
+  .cat-head b{font-size:14px;flex-shrink:0;}
+  .cat-sub{color:var(--text-faint);font-size:12px;}
+  .cat-head .spacer{flex:1;}
+  .cat-nums{text-align:right;font-size:12.5px;}
+  .cat-nums .planned{color:var(--text-soft);}
+  .cat-nums .actual{font-weight:650;}
+  .chev{transition:transform .15s ease;color:var(--text-faint);}
+  .cat-block.open .chev{transform:rotate(90deg);}
+  .cat-body{display:none;border-top:1px solid var(--border);padding:12px 15px 15px;background:var(--bg);}
+  .cat-block.open .cat-body{display:block;}
+  .cat-disabled{opacity:.5;}
+
+  .li-row{display:grid;grid-template-columns:1.6fr .7fr .8fr .8fr 1fr .3fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .li-row:last-child{border-bottom:none;}
+  .li-head{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;font-weight:650;}
+  @media (max-width:760px){
+    .li-row{grid-template-columns:1fr!important;gap:4px;padding:12px 0;}
+    .li-head{display:none;}
+    .li-row > div::before{content:attr(data-label);display:inline-block;min-width:90px;color:var(--text-faint);font-size:11px;text-transform:uppercase;font-weight:650;}
+  }
+  .li-row input, .li-row select{width:100%;padding:6px 8px;font-size:12.5px;border:1px solid var(--border);border-radius:7px;background:var(--surface);}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;padding:4px 9px;border-radius:20px;white-space:nowrap;}
+  .add-li-btn{margin-top:10px;}
+
+  table.budget{width:100%;border-collapse:collapse;}
+  table.budget th{text-align:left;font-size:11px;text-transform:uppercase;color:var(--text-faint);font-weight:650;padding:6px 10px;border-bottom:1px solid var(--border);}
+  table.budget td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;}
+  table.budget tr:last-child td{border-bottom:none;}
+  table.budget td.num,table.budget th.num{text-align:right;}
+  .variance-neg{color:var(--bad);}
+  .variance-pos{color:var(--ok);}
+  .totals-row td{font-weight:700;border-top:2px solid var(--text);}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-sm);}
+  .kpi .label{font-size:11.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;font-weight:650;margin-bottom:6px;}
+  .kpi .value{font-size:20px;font-weight:700;font-family:var(--mono);}
+
+  .history-item{display:flex;justify-content:space-between;font-size:12.5px;padding:8px 0;border-bottom:1px solid var(--border);color:var(--text-soft);gap:10px;}
+  .history-item:last-child{border-bottom:none;}
+
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  select.filter{padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:12.5px;}
+
+  .stock-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .stock-row:last-child{border-bottom:none;}
+  .stock-row .name{flex:1;font-size:13.5px;}
+  .stock-qty{font-family:var(--mono);font-weight:650;min-width:24px;text-align:center;}
+
+  .export-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+  .export-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface);}
+  .export-card h4{font-size:13.5px;margin-bottom:4px;}
+  .export-card p{font-size:12px;color:var(--text-soft);margin:0 0 12px;}
+
+  .range-bar{height:8px;border-radius:5px;background:var(--surface-2);position:relative;overflow:hidden;margin-top:6px;}
+  .range-fill{position:absolute;top:0;left:0;height:100%;border-radius:5px;}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:200;opacity:0;transition:opacity .2s ease;pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  .muted{color:var(--text-soft);}
+  .small{font-size:12px;}
+  .flex{display:flex;}
+  .gap8{gap:8px;}
+  .between{justify-content:space-between;}
+  .center{align-items:center;}
+  .wrap{flex-wrap:wrap;}
+  .mt8{margin-top:8px;}
+  .mt14{margin-top:14px;}
+  .mb14{margin-bottom:14px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+<script>
+/* ============================================================
+   ГРИМ-СМЕТА — vanilla JS SPA, localStorage persistence
+   ============================================================ */
+
+const STORAGE_KEY = 'grimSmeta_db_v1';
+
+const CATEGORY_PALETTE = ['#5B4B8A','#B5789C','#C9A227','#6B8F71','#4F7FA8','#B5563C','#8A6BA8','#4F8FBF','#9B8457','#7A7482'];
+
+const DEFAULT_CATEGORIES = [
+  {key:'consumables', name:'Расходники'},
+  {key:'cosmetics',   name:'Косметика'},
+  {key:'hair',        name:'Волосы'},
+  {key:'postizh',     name:'Постиж'},
+  {key:'sfx',         name:'Спецгрим'},
+  {key:'prosthetics', name:'Пластика'},
+  {key:'salon',       name:'Салонные процедуры'},
+  {key:'equipment',   name:'Техника'},
+  {key:'individual',  name:'Индивидуальный грим'},
+  {key:'sundries',    name:'Хозтовары'},
+];
+
+const STATUS_META = {
+  NEED_TO_DECIDE: {label:'Нужно определить', color:'#7A7482', bg:'#EDEBEF'},
+  NEED_TO_BUY:    {label:'Нужно купить',      color:'#B98A22', bg:'#FBF1DD'},
+  ORDERED:        {label:'Заказано',          color:'#4F7FA8', bg:'#E9F1F7'},
+  IN_PRODUCTION:  {label:'В изготовлении',    color:'#8A6BA8', bg:'#F1EBF6'},
+  RECEIVED:       {label:'Получено',          color:'#6B8F71', bg:'#E9F1E9'},
+  IN_USE:         {label:'В работе',          color:'#4F8FBF', bg:'#E9F2FA'},
+  CONSUMED:       {label:'Израсходовано',     color:'#9B9B9B', bg:'#EFEFEF'},
+  NOT_USED:       {label:'Не используется',   color:'#C4C0BB', bg:'#F5F3F0'},
+};
+const STATUS_ORDER = Object.keys(STATUS_META);
+
+function uid(prefix){ return (prefix||'id') + '_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function fmt(n){ n = Math.round(Number(n)||0); return n.toLocaleString('ru-RU'); }
+function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ console.warn('DB load failed', e); }
+  return { projects: [], currentProjectId: null };
+}
+function saveDB(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+
+let db = loadDB();
+let ui = { tab:'smeta', openCategoryId:null, showCategoryAdmin:false, purchaseFilterStatus:'ALL', purchaseFilterCategory:'ALL' };
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---------- Project helpers ---------- */
+function currentProject(){
+  return db.projects.find(p=>p.id===db.currentProjectId) || null;
+}
+
+function buildCategories(){
+  return DEFAULT_CATEGORIES.map((c,i)=>({
+    id: uid('cat'),
+    key:c.key,
+    name:c.name,
+    order:i,
+    color: CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
+    type:'auto',
+    plannedBudget:0,
+    approvedBudget:0,
+    actualBudget:0,
+    note:'',
+    isEnabled:true,
+  }));
+}
+
+function newProjectDraft(){
+  return {
+    id: uid('proj'),
+    name: 'Новый проект',
+    projType: 'modern',
+    days: 5,
+    stations: 2,
+    onSetKits: 1,
+    mode: 'CLIENT_ONLY',
+    contingencyPercent: 15,
+    hasPlastic: 'unknown',
+    hasPostizh: 'unknown',
+    hasSfx: 'unknown',
+    hasSalon: 'unknown',
+    hasIndividual: 'unknown',
+    stage: 'wizard',
+    categories: buildCategories(),
+    lineItems: [],
+    stock: [],
+    reallocationHistory: [],
+    estimate: null,
+    budgetPlannedTotal: 0,
+    createdAt: Date.now(),
+  };
+}
+
+/* ---------- Rough estimate ("рыба") engine ---------- */
+function yn(val, yesRange, unknownRange, noRange){
+  if(val==='yes') return yesRange;
+  if(val==='no') return noRange || [0,0];
+  return unknownRange;
+}
+
+function computeEstimate(p){
+  const days = Math.max(1, Number(p.days)||1);
+  const stations = Math.max(1, Number(p.stations)||1);
+  const kits = Math.max(0, Number(p.onSetKits)||0);
+
+  const perCat = {};
+  perCat.consumables = [1500*days, 2000*days];
+  perCat.cosmetics   = [15000*stations, 40000*stations];
+  perCat.hair        = [2000*days, 5000*days];
+  perCat.postizh     = yn(p.hasPostizh, [100000,300000], [50000,150000], [0,0]);
+  perCat.sfx         = yn(p.hasSfx, [80000,250000], [30000,100000], [0,0]);
+  perCat.prosthetics = yn(p.hasPlastic, [200000,500000], [100000,250000], [0,0]);
+  perCat.salon       = yn(p.hasSalon, [20000,80000], [10000,40000], [0,0]);
+  perCat.equipment   = [(stations+kits)*15000, (stations+kits)*30000];
+  perCat.individual  = yn(p.hasIndividual, [days*5000, days*15000], [days*2000, days*7000], [0,0]);
+  perCat.sundries    = [500*days, 1500*days];
+
+  let mult = {postizh:1, sfx:1, prosthetics:1, hair:1};
+  if(p.projType==='historical'){ mult.postizh=1.3; mult.hair=1.2; }
+  if(p.projType==='fantasy'){ mult.sfx=1.4; mult.prosthetics=1.3; mult.postizh=1.15; }
+  ['postizh','sfx','prosthetics','hair'].forEach(k=>{
+    perCat[k] = [perCat[k][0]*mult[k], perCat[k][1]*mult[k]];
+  });
+
+  let low=0, high=0;
+  const byCategory = {};
+  DEFAULT_CATEGORIES.forEach(c=>{
+    const range = perCat[c.key] || [0,0];
+    byCategory[c.key] = { low: Math.round(range[0]), high: Math.round(range[1]) };
+    low += range[0]; high += range[1];
+  });
+
+  const contingency = clamp(Number(p.contingencyPercent)||15, 0, 100)/100;
+  const mid = (low+high)/2;
+  const recommended = Math.round(mid * (1+contingency));
+
+  return { low: Math.round(low), high: Math.round(high), recommended, byCategory, contingencyPercent: p.contingencyPercent };
+}
+
+function applyEstimateToCategories(p){
+  const est = computeEstimate(p);
+  p.estimate = est;
+  p.categories.forEach(cat=>{
+    const r = est.byCategory[cat.key];
+    if(r){
+      cat.plannedBudget = Math.round((r.low + r.high)/2);
+    }
+  });
+  p.budgetPlannedTotal = est.recommended;
+}
+
+/* ---------- Line item helpers ---------- */
+function catById(p, id){ return p.categories.find(c=>c.id===id); }
+function lineItemsForCategory(p, catId){ return p.lineItems.filter(li=>li.categoryId===catId); }
+
+function categoryActual(p, cat){
+  return lineItemsForCategory(p, cat.id).reduce((s,li)=> s + (Number(li.priceActual||li.priceEstimated||0) * Number(li.quantityActual||li.quantityPlanned||0)), 0);
+}
+
+/* ---------- Stock helpers ---------- */
+function findStock(p, name){ return p.stock.find(s=>s.materialName.toLowerCase()===String(name||'').toLowerCase()); }
+function stockQty(p, name){ const s = findStock(p,name); return s ? Number(s.quantity)||0 : 0; }
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const app = document.getElementById('app');
+  const p = currentProject();
+  if(!p){
+    app.innerHTML = renderProjectList();
+  } else if(p.stage==='wizard'){
+    app.innerHTML = renderTopbar(p) + renderWizard(p);
+  } else if(p.stage==='estimate'){
+    app.innerHTML = renderTopbar(p) + renderEstimateScreen(p);
+  } else {
+    app.innerHTML = renderTopbar(p) + renderTabs() + renderWorkTab(p);
+  }
+  attachHandlers();
+}
+
+function renderTopbar(p){
+  return `
+  <div class="topbar">
+    <div class="brand" style="cursor:pointer" data-action="go-home">
+      <div class="brand-mark"></div>
+      <div class="brand-text"><b>Грим-смета</b><span>${p ? escapeHtml(p.name) : 'планировщик бюджета'}</span></div>
+    </div>
+    <div class="top-actions">
+      ${p ? `<button class="btn btn-ghost btn-sm" data-action="go-home">← Все проекты</button>` : ''}
+      ${p && p.stage==='work' ? `<button class="btn btn-sm" data-action="rename-project">Переименовать</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderProjectList(){
+  const projects = db.projects.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  if(projects.length===0){
+    return `
+    <div class="topbar">
+      <div class="brand"><div class="brand-mark"></div><div class="brand-text"><b>Грим-смета</b><span>планировщик бюджета грима</span></div></div>
+    </div>
+    <div class="empty-state card">
+      <div class="brand-mark"></div>
+      <h3>Пока нет проектов</h3>
+      <p class="muted mt8">Создайте первый проект и получите черновой бюджет за пару минут.</p>
+      <button class="btn btn-primary mt14" data-action="new-project">+ Новый проект</button>
+    </div>`;
+  }
+  return `
+  <div class="topbar">
+    <div class="brand"><div class="brand-mark"></div><div class="brand-text"><b>Грим-смета</b><span>планировщик бюджета грима</span></div></div>
+    <div class="top-actions"><button class="btn btn-primary" data-action="new-project">+ Новый проект</button></div>
+  </div>
+  <div class="proj-grid">
+    ${projects.map(p=>`
+      <div class="proj-card" data-action="open-project" data-id="${p.id}">
+        <span class="proj-stage ${p.stage==='work'?'stage-work':'stage-draft'}">${p.stage==='work'?'В работе':'Черновик'}</span>
+        <h3 class="mt8">${escapeHtml(p.name)}</h3>
+        <div class="proj-meta">${p.days} смен · ${p.stations} станций · ${p.mode==='PERSONAL'?'личный склад':'без склада'}</div>
+        ${p.stage==='work' ? `<div class="small muted">План: <span class="num">${fmt(p.budgetPlannedTotal)} ₽</span></div>` : `<div class="small muted">Черновик сметы</div>`}
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function renderWizard(p){
+  const yesNoUnknown = (field, label) => `
+    <div class="field">
+      <label>${label}</label>
+      <div class="yn-toggle" data-field="${field}">
+        <button type="button" data-val="yes" class="${p[field]==='yes'?'active':''}">Да</button>
+        <button type="button" data-val="unknown" class="${p[field]==='unknown'?'active':''}">Неизвестно</button>
+        <button type="button" data-val="no" class="${p[field]==='no'?'active':''}">Нет</button>
+      </div>
+    </div>`;
+
+  return `
+  <div class="card">
+    <div class="section-title">Шаг 1 · Параметры проекта</div>
+    <h2 class="mb14">Рыба бюджета</h2>
+
+    <div class="field">
+      <label>Название проекта</label>
+      <input type="text" id="w-name" value="${escapeHtml(p.name)}" placeholder="Например: «Реклама XYZ, июль»">
+    </div>
+
+    <div class="field-row3">
+      <div class="field">
+        <label>Жанр проекта</label>
+        <select id="w-projType">
+          <option value="modern" ${p.projType==='modern'?'selected':''}>Современность</option>
+          <option value="historical" ${p.projType==='historical'?'selected':''}>Историческое</option>
+          <option value="fantasy" ${p.projType==='fantasy'?'selected':''}>Фэнтези / фантастика</option>
+          <option value="custom" ${p.projType==='custom'?'selected':''}>Другое</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Количество смен</label>
+        <input type="number" min="1" id="w-days" value="${p.days}">
+      </div>
+      <div class="field">
+        <label>Станции грима</label>
+        <input type="number" min="1" id="w-stations" value="${p.stations}">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Площадочные комплекты</label>
+        <input type="number" min="0" id="w-kits" value="${p.onSetKits}">
+      </div>
+      <div class="field">
+        <label>Режим учёта</label>
+        <select id="w-mode">
+          <option value="CLIENT_ONLY" ${p.mode==='CLIENT_ONLY'?'selected':''}>Только этот проект (без склада)</option>
+          <option value="PERSONAL" ${p.mode==='PERSONAL'?'selected':''}>Личный (со складом)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title mt14">Наличие в проекте</div>
+    <div class="field-row3">
+      ${yesNoUnknown('hasPlastic','Пластика')}
+      ${yesNoUnknown('hasPostizh','Постиж')}
+      ${yesNoUnknown('hasSfx','Спецэффекты')}
+    </div>
+    <div class="field-row">
+      ${yesNoUnknown('hasSalon','Салонные процедуры')}
+      ${yesNoUnknown('hasIndividual','Индивидуальный грим')}
+    </div>
+
+    <div class="field mt14">
+      <label>Подушка безопасности (%)</label>
+      <input type="number" min="0" max="100" id="w-contingency" value="${p.contingencyPercent}" style="max-width:120px">
+      <div class="hint">Автоматически добавляется к рекомендуемому бюджету. По умолчанию 15–20%.</div>
+    </div>
+
+    <div class="flex between mt14">
+      <button class="btn btn-ghost" data-action="delete-draft">Удалить черновик</button>
+      <button class="btn btn-primary" data-action="generate-estimate">Сгенерировать рыбу бюджета →</button>
+    </div>
+  </div>`;
+}
+
+function renderEstimateScreen(p){
+  const est = computeEstimate(p);
+  const maxHigh = Math.max(...DEFAULT_CATEGORIES.map(c=>est.byCategory[c.key].high), 1);
+
+  return `
+  <div class="card">
+    <div class="section-title">Шаг 2 · Ориентировочный бюджет</div>
+    <h2>Рыба бюджета готова</h2>
+    <div class="kpi-row mt14">
+      <div class="kpi"><div class="label">Минимум</div><div class="value">${fmt(est.low)} ₽</div></div>
+      <div class="kpi"><div class="label">Максимум</div><div class="value">${fmt(est.high)} ₽</div></div>
+      <div class="kpi" style="border-color:var(--accent);background:var(--accent-soft);"><div class="label" style="color:var(--accent)">Рекомендуемый (+подушка)</div><div class="value" style="color:var(--accent)">${fmt(est.recommended)} ₽</div></div>
+    </div>
+
+    <div class="section-title mt14">По категориям</div>
+    <p class="hint mb14">Названия и порядок категорий можно изменить прямо сейчас — это не повлияет на остальной проект. Плановый бюджет каждой категории будет установлен как середина диапазона; вы сможете скорректировать его позже.</p>
+    ${p.categories.slice().sort((a,b)=>a.order-b.order).map((cat)=>{
+      const r = est.byCategory[cat.key] || {low:0,high:0};
+      const pct = Math.round((r.high/maxHigh)*100);
+      return `
+      <div class="cat-block open" style="margin-bottom:8px;">
+        <div class="cat-head" style="cursor:default;">
+          <div class="cat-dot" style="background:${cat.color}"></div>
+          <input type="text" class="est-cat-name" data-id="${cat.id}" value="${escapeHtml(cat.name)}" style="border:none;background:transparent;font-weight:650;font-size:14px;padding:2px 4px;border-radius:6px;max-width:220px;">
+          <div class="spacer"></div>
+          <div class="cat-nums num">${fmt(r.low)} – ${fmt(r.high)} ₽</div>
+          <button class="btn icon-btn btn-ghost" data-action="cat-up" data-id="${cat.id}" title="Выше">↑</button>
+          <button class="btn icon-btn btn-ghost" data-action="cat-down" data-id="${cat.id}" title="Ниже">↓</button>
+        </div>
+        <div class="range-bar" style="margin:0 15px 12px;width:calc(100% - 30px);"><div class="range-fill" style="width:${pct}%;background:${cat.color}"></div></div>
+      </div>`;
+    }).join('')}
+
+    <div class="flex between mt14">
+      <button class="btn btn-ghost" data-action="back-to-wizard">← Изменить параметры</button>
+      <button class="btn btn-primary" data-action="start-work">Начать работу над проектом →</button>
+    </div>
+  </div>`;
+}
+
+function renderTabs(){
+  const tabs = [
+    {id:'smeta', label:'🧾 Смета'},
+    {id:'budget', label:'💰 Бюджет'},
+    {id:'purchase', label:'🛒 Закупка'},
+    {id:'stock', label:'📦 Склад'},
+    {id:'export', label:'📤 Экспорт'},
+  ];
+  return `<div class="tabs">${tabs.map(t=>`<button class="tab ${ui.tab===t.id?'active':''}" data-action="set-tab" data-tab="${t.id}">${t.label}</button>`).join('')}</div>`;
+}
+
+function renderWorkTab(p){
+  if(ui.tab==='smeta') return renderSmeta(p);
+  if(ui.tab==='budget') return renderBudget(p);
+  if(ui.tab==='purchase') return renderPurchase(p);
+  if(ui.tab==='stock') return renderStock(p);
+  if(ui.tab==='export') return renderExport(p);
+  return '';
+}
+
+/* ---- Смета tab ---- */
+function renderSmeta(p){
+  const cats = p.categories.slice().sort((a,b)=>a.order-b.order);
+  return `
+  <div class="flex between center mb14 wrap gap8">
+    <h2>Смета проекта</h2>
+    <button class="btn btn-sm" data-action="toggle-cat-admin">${ui.showCategoryAdmin ? 'Скрыть настройку категорий' : '⚙ Настроить категории'}</button>
+  </div>
+
+  ${ui.showCategoryAdmin ? renderCategoryAdmin(p) : ''}
+
+  ${cats.filter(c=>c.isEnabled || ui.showCategoryAdmin).map(cat=>renderCategoryBlock(p,cat)).join('')}
+  `;
+}
+
+function renderCategoryAdmin(p){
+  const cats = p.categories.slice().sort((a,b)=>a.order-b.order);
+  return `
+  <div class="card mb14">
+    <div class="section-title">Категории</div>
+    <p class="hint mb14">Переименование, порядок и включение/выключение категорий безопасны и не влияют на уже внесённые позиции. Удаление категорий с позициями сметы пока недоступно — чтобы не потерять данные.</p>
+    ${cats.map(cat=>{
+      const count = lineItemsForCategory(p,cat.id).length;
+      return `
+      <div class="flex center gap8 mb14 wrap ${!cat.isEnabled?'cat-disabled':''}" style="padding-bottom:10px;border-bottom:1px solid var(--border);">
+        <div class="cat-dot" style="background:${cat.color}"></div>
+        <input type="text" class="cat-rename" data-id="${cat.id}" value="${escapeHtml(cat.name)}" style="flex:1;min-width:120px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;">
+        <span class="small muted">${count} поз.</span>
+        <button class="btn icon-btn btn-ghost" data-action="cat-up" data-id="${cat.id}">↑</button>
+        <button class="btn icon-btn btn-ghost" data-action="cat-down" data-id="${cat.id}">↓</button>
+        <button class="btn btn-sm" data-action="cat-toggle-enabled" data-id="${cat.id}">${cat.isEnabled?'Выключить':'Включить'}</button>
+      </div>`;
+    }).join('')}
+    <div class="flex gap8 mt14 wrap">
+      <input type="text" id="new-cat-name" placeholder="Название новой категории" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+      <button class="btn btn-primary btn-sm" data-action="add-category">+ Добавить категорию</button>
+    </div>
+  </div>`;
+}
+
+function renderCategoryBlock(p, cat){
+  const items = lineItemsForCategory(p, cat.id);
+  const actual = categoryActual(p,cat);
+  const isOpen = ui.openCategoryId===cat.id;
+  return `
+  <div class="cat-block ${isOpen?'open':''} ${!cat.isEnabled?'cat-disabled':''}">
+    <div class="cat-head" data-action="toggle-category" data-id="${cat.id}">
+      <span class="chev">›</span>
+      <div class="cat-dot" style="background:${cat.color}"></div>
+      <b>${escapeHtml(cat.name)}</b>
+      <span class="cat-sub">${items.length} поз.${!cat.isEnabled?' · выключена':''}</span>
+      <div class="spacer"></div>
+      <div class="cat-nums">
+        <div class="planned num">план ${fmt(cat.plannedBudget)} ₽</div>
+        <div class="actual num">${fmt(actual)} ₽</div>
+      </div>
+    </div>
+    <div class="cat-body">
+      ${items.length ? `
+      <div class="li-row li-head">
+        <div>Материал</div><div>Кол-во план</div><div>Кол-во факт</div><div>Цена</div><div>Статус</div><div></div>
+      </div>` : ''}
+      ${items.map(li=>renderLineItemRow(li)).join('')}
+      <button class="btn btn-sm add-li-btn" data-action="add-line-item" data-cat="${cat.id}">+ Добавить материал</button>
+    </div>
+  </div>`;
+}
+
+function renderLineItemRow(li){
+  const sMeta = STATUS_META[li.status] || STATUS_META.NEED_TO_DECIDE;
+  return `
+  <div class="li-row" data-li="${li.id}">
+    <div data-label="Материал"><input type="text" class="li-field" data-field="name" value="${escapeHtml(li.name)}" placeholder="Название материала"></div>
+    <div data-label="Кол-во план"><input type="number" class="li-field" data-field="quantityPlanned" value="${li.quantityPlanned}" min="0" step="0.1"></div>
+    <div data-label="Кол-во факт"><input type="number" class="li-field" data-field="quantityActual" value="${li.quantityActual}" min="0" step="0.1"></div>
+    <div data-label="Цена, ₽"><input type="number" class="li-field" data-field="priceEstimated" value="${li.priceEstimated}" min="0"></div>
+    <div data-label="Статус">
+      <select class="li-field" data-field="status" style="background:${sMeta.bg};color:${sMeta.color};font-weight:600;">
+        ${STATUS_ORDER.map(s=>`<option value="${s}" ${li.status===s?'selected':''}>${STATUS_META[s].label}</option>`).join('')}
+      </select>
+    </div>
+    <div><button class="btn icon-btn btn-ghost btn-danger" data-action="delete-line-item" data-id="${li.id}" title="Удалить">✕</button></div>
+  </div>`;
+}
+
+/* ---- Бюджет tab ---- */
+function renderBudget(p){
+  const cats = p.categories.filter(c=>c.isEnabled).slice().sort((a,b)=>a.order-b.order);
+  let totalPlanned=0, totalApproved=0, totalActual=0;
+  const rows = cats.map(cat=>{
+    const actual = categoryActual(p,cat);
+    totalPlanned += Number(cat.plannedBudget)||0;
+    totalApproved += Number(cat.approvedBudget)||0;
+    totalActual += actual;
+    const base = cat.approvedBudget || cat.plannedBudget;
+    const variance = base - actual;
+    return `
+    <tr>
+      <td><span class="cat-dot" style="background:${cat.color};display:inline-block;margin-right:6px;"></span>${escapeHtml(cat.name)}</td>
+      <td class="num"><input type="number" class="budget-field" data-cat="${cat.id}" data-field="plannedBudget" value="${cat.plannedBudget}" style="width:100px;text-align:right;border:1px solid var(--border);border-radius:6px;padding:4px 6px;"></td>
+      <td class="num"><input type="number" class="budget-field" data-cat="${cat.id}" data-field="approvedBudget" value="${cat.approvedBudget}" style="width:100px;text-align:right;border:1px solid var(--border);border-radius:6px;padding:4px 6px;"></td>
+      <td class="num">${fmt(actual)}</td>
+      <td class="num ${variance<0?'variance-neg':'variance-pos'}">${variance<0?'':'+'}${fmt(variance)}</td>
+    </tr>`;
+  }).join('');
+
+  const overallVariance = (totalApproved||totalPlanned) - totalActual;
+  const catOptions = cats.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+
+  return `
+  <h2 class="mb14">Бюджет проекта</h2>
+  <div class="kpi-row">
+    <div class="kpi"><div class="label">План</div><div class="value">${fmt(totalPlanned)} ₽</div></div>
+    <div class="kpi"><div class="label">Утверждено</div><div class="value">${fmt(totalApproved||totalPlanned)} ₽</div></div>
+    <div class="kpi"><div class="label">Факт</div><div class="value">${fmt(totalActual)} ₽</div></div>
+    <div class="kpi" style="${overallVariance<0?'background:var(--bad-soft)':'background:var(--ok-soft)'}"><div class="label">Отклонение</div><div class="value ${overallVariance<0?'variance-neg':'variance-pos'}">${overallVariance<0?'':'+'}${fmt(overallVariance)} ₽</div></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">По категориям</div>
+    <div style="overflow-x:auto;">
+    <table class="budget">
+      <thead><tr><th>Категория</th><th class="num">План</th><th class="num">Утверждено</th><th class="num">Факт</th><th class="num">Отклонение</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr class="totals-row"><td>Итого</td><td class="num">${fmt(totalPlanned)}</td><td class="num">${fmt(totalApproved||totalPlanned)}</td><td class="num">${fmt(totalActual)}</td><td class="num ${overallVariance<0?'variance-neg':'variance-pos'}">${overallVariance<0?'':'+'}${fmt(overallVariance)}</td></tr></tfoot>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Подушка безопасности</div>
+    <div class="flex center gap8">
+      <input type="number" id="contingency-input" value="${p.contingencyPercent}" min="0" max="100" style="width:80px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;">
+      <span class="muted small">% — применяется при пересчёте рыбы бюджета</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Перераспределение бюджета</div>
+    <div class="field-row3">
+      <div class="field"><label>Откуда</label><select id="realloc-from">${catOptions}</select></div>
+      <div class="field"><label>Куда</label><select id="realloc-to">${catOptions}</select></div>
+      <div class="field"><label>Сумма, ₽</label><input type="number" id="realloc-amount" min="0" value="10000"></div>
+    </div>
+    <div class="field"><label>Комментарий (необязательно)</label><input type="text" id="realloc-note" placeholder="Причина переноса"></div>
+    <button class="btn btn-primary btn-sm" data-action="do-realloc">Перенести</button>
+
+    ${p.reallocationHistory.length ? `
+    <div class="section-title mt14">История переносов</div>
+    ${p.reallocationHistory.slice().reverse().map(h=>`
+      <div class="history-item">
+        <span>${new Date(h.date).toLocaleDateString('ru-RU')} · ${escapeHtml(h.fromName)} → ${escapeHtml(h.toName)} ${h.note?('· '+escapeHtml(h.note)):''}</span>
+        <span class="num">${fmt(h.amount)} ₽</span>
+      </div>`).join('')}
+    ` : ''}
+  </div>`;
+}
+
+/* ---- Закупка tab ---- */
+function renderPurchase(p){
+  const cats = p.categories.filter(c=>c.isEnabled);
+  let items = p.lineItems.slice();
+  if(ui.purchaseFilterStatus!=='ALL') items = items.filter(li=>li.status===ui.purchaseFilterStatus);
+  if(ui.purchaseFilterCategory!=='ALL') items = items.filter(li=>li.categoryId===ui.purchaseFilterCategory);
+
+  return `
+  <h2 class="mb14">Закупка</h2>
+  <div class="filter-bar">
+    <select class="filter" id="pf-status">
+      <option value="ALL" ${ui.purchaseFilterStatus==='ALL'?'selected':''}>Все статусы</option>
+      ${STATUS_ORDER.map(s=>`<option value="${s}" ${ui.purchaseFilterStatus===s?'selected':''}>${STATUS_META[s].label}</option>`).join('')}
+    </select>
+    <select class="filter" id="pf-category">
+      <option value="ALL" ${ui.purchaseFilterCategory==='ALL'?'selected':''}>Все категории</option>
+      ${cats.map(c=>`<option value="${c.id}" ${ui.purchaseFilterCategory===c.id?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>
+  </div>
+
+  <div class="card">
+    ${items.length===0 ? `<p class="muted">Нет позиций по выбранному фильтру.</p>` : `
+    <div class="li-row li-head" style="grid-template-columns:1.6fr .8fr .8fr 1.2fr;">
+      <div>Материал</div><div>Категория</div><div>Кол-во</div><div>Статус</div>
+    </div>
+    ${items.map(li=>{
+      const cat = catById(p, li.categoryId);
+      const need = Math.max(0, Number(li.quantityPlanned||0) - (p.mode==='PERSONAL' ? stockQty(p, li.name) : 0));
+      return `
+      <div class="li-row" style="grid-template-columns:1.6fr .8fr .8fr 1.2fr;" data-li="${li.id}">
+        <div data-label="Материал"><b>${escapeHtml(li.name||'—')}</b>${p.mode==='PERSONAL' && stockQty(p,li.name)>0 ? `<div class="small muted">на складе: ${stockQty(p,li.name)}, купить: ${need}</div>`:''}</div>
+        <div data-label="Категория"><span class="cat-dot" style="background:${cat?cat.color:'#ccc'};display:inline-block;margin-right:5px;"></span>${cat?escapeHtml(cat.name):'—'}</div>
+        <div data-label="Кол-во" class="num">${li.quantityPlanned}</div>
+        <div data-label="Статус">
+          <select class="li-field" data-field="status">
+            ${STATUS_ORDER.map(s=>`<option value="${s}" ${li.status===s?'selected':''}>${STATUS_META[s].label}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+    }).join('')}
+    `}
+  </div>`;
+}
+
+/* ---- Склад tab ---- */
+function renderStock(p){
+  if(p.mode!=='PERSONAL'){
+    return `
+    <h2 class="mb14">Склад</h2>
+    <div class="card">
+      <p class="muted">Этот проект работает в режиме «только для клиента» — склад не используется. Чтобы включить учёт остатков, откройте параметры проекта заново и выберите режим «личный».</p>
+      <button class="btn btn-sm mt14" data-action="enable-personal-mode">Включить личный склад для этого проекта</button>
+    </div>`;
+  }
+  return `
+  <h2 class="mb14">Склад</h2>
+  <div class="card">
+    <div class="section-title">Остатки материалов</div>
+    ${p.stock.length===0 ? `<p class="muted mb14">Пока нет остатков на складе.</p>` : p.stock.map(s=>`
+      <div class="stock-row">
+        <span class="name">${escapeHtml(s.materialName)}</span>
+        <button class="btn icon-btn btn-ghost" data-action="stock-adjust" data-id="${s.id}" data-delta="-1">−</button>
+        <span class="stock-qty">${s.quantity}</span>
+        <button class="btn icon-btn btn-ghost" data-action="stock-adjust" data-id="${s.id}" data-delta="1">+</button>
+        <button class="btn icon-btn btn-ghost btn-danger" data-action="stock-delete" data-id="${s.id}">✕</button>
+      </div>
+    `).join('')}
+    <div class="flex gap8 mt14 wrap">
+      <input type="text" id="new-stock-name" placeholder="Название материала" style="flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+      <input type="number" id="new-stock-qty" placeholder="Кол-во" value="1" style="width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+      <button class="btn btn-primary btn-sm" data-action="add-stock">+ Добавить</button>
+    </div>
+  </div>`;
+}
+
+/* ---- Экспорт tab ---- */
+function renderExport(p){
+  const cats = p.categories.filter(c=>c.isEnabled);
+  return `
+  <h2 class="mb14">Экспорт</h2>
+  <div class="export-grid">
+    <div class="export-card">
+      <h4>📄 Полная смета — CSV</h4>
+      <p>Категория, материал, количество, цена, сумма, статус.</p>
+      <button class="btn btn-sm" data-action="export-full-csv">Скачать CSV</button>
+    </div>
+    <div class="export-card">
+      <h4>📊 Полная смета — Excel</h4>
+      <p>Та же таблица в формате .xlsx.</p>
+      <button class="btn btn-sm" data-action="export-full-xlsx">Скачать Excel</button>
+    </div>
+    <div class="export-card">
+      <h4>🛒 Закупочный лист</h4>
+      <p>Только что купить: материал, количество — без цен.</p>
+      <button class="btn btn-sm" data-action="export-purchase-list">Скачать закупочный лист</button>
+    </div>
+    <div class="export-card">
+      <h4>🎯 Экспорт по фильтру</h4>
+      <p>Выберите статус и/или категорию.</p>
+      <select class="filter mb14" id="ex-status" style="width:100%;margin-bottom:8px;">
+        <option value="ALL">Все статусы</option>
+        ${STATUS_ORDER.map(s=>`<option value="${s}">${STATUS_META[s].label}</option>`).join('')}
+      </select>
+      <select class="filter mb14" id="ex-category" style="width:100%;margin-bottom:10px;">
+        <option value="ALL">Все категории</option>
+        ${cats.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm" data-action="export-filtered-csv">Скачать CSV по фильтру</button>
+    </div>
+  </div>
+  <div class="card mt14">
+    <p class="hint">Google Sheets: экспортируйте CSV и импортируйте его в Google Таблицы (Файл → Импортировать) — прямая синхронизация появится в следующих версиях.</p>
+  </div>`;
+}
+
+/* ============================================================
+   EXPORT LOGIC
+   ============================================================ */
+function buildFullRows(p, filterFn){
+  let items = p.lineItems.slice();
+  if(filterFn) items = items.filter(filterFn);
+  return items.map(li=>{
+    const cat = catById(p, li.categoryId);
+    const qty = Number(li.quantityActual)||Number(li.quantityPlanned)||0;
+    const price = Number(li.priceActual)||Number(li.priceEstimated)||0;
+    return {
+      'Категория': cat?cat.name:'',
+      'Материал': li.name||'',
+      'Кол-во план': li.quantityPlanned||0,
+      'Кол-во факт': li.quantityActual||0,
+      'Цена, ₽': price,
+      'Сумма, ₽': Math.round(qty*price),
+      'Статус': STATUS_META[li.status]?STATUS_META[li.status].label:li.status,
+      'Заметки': li.notes||'',
+    };
+  });
+}
+function rowsToCSV(rows){
+  if(rows.length===0) return '\uFEFF';
+  const headers = Object.keys(rows[0]);
+  const esc = v => `"${String(v).replace(/"/g,'""')}"`;
+  const lines = [headers.map(esc).join(',')];
+  rows.forEach(r=> lines.push(headers.map(h=>esc(r[h])).join(',')));
+  return '\uFEFF' + lines.join('\r\n');
+}
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportFullCSV(p){
+  const csv = rowsToCSV(buildFullRows(p));
+  downloadBlob(csv, `${slug(p.name)}_smeta.csv`, 'text/csv;charset=utf-8');
+  toast('CSV скачан');
+}
+function exportFullXLSX(p){
+  if(typeof XLSX==='undefined'){ toast('Модуль Excel не загрузился — проверьте интернет-соединение'); return; }
+  const rows = buildFullRows(p);
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Смета');
+  XLSX.writeFile(wb, `${slug(p.name)}_smeta.xlsx`);
+  toast('Excel скачан');
+}
+function exportPurchaseList(p){
+  const items = p.lineItems.filter(li=>li.status==='NEED_TO_BUY'||li.status==='NEED_TO_DECIDE');
+  const rows = items.map(li=>{
+    const cat = catById(p, li.categoryId);
+    return {'Категория':cat?cat.name:'','Материал':li.name||'','Количество':li.quantityPlanned||0,'Заметки':li.notes||''};
+  });
+  downloadBlob(rowsToCSV(rows), `${slug(p.name)}_zakupka.csv`, 'text/csv;charset=utf-8');
+  toast('Закупочный лист скачан');
+}
+function exportFilteredCSV(p){
+  const status = document.getElementById('ex-status').value;
+  const catId = document.getElementById('ex-category').value;
+  const rows = buildFullRows(p, li => (status==='ALL'||li.status===status) && (catId==='ALL'||li.categoryId===catId));
+  downloadBlob(rowsToCSV(rows), `${slug(p.name)}_filtered.csv`, 'text/csv;charset=utf-8');
+  toast('Фильтрованный CSV скачан');
+}
+function slug(s){ return (s||'project').toLowerCase().replace(/[^a-z0-9а-яё]+/gi,'_').slice(0,40); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* ============================================================
+   EVENT HANDLERS
+   ============================================================ */
+function attachHandlers(){
+  const app = document.getElementById('app');
+
+  app.querySelectorAll('[data-action]').forEach(el=>{
+    el.addEventListener('click', onAction);
+  });
+
+  bindWizardInputs();
+  bindEstimateInputs();
+  bindBudgetInputs();
+  bindLineItemInputs();
+  bindPurchaseInputs();
+  bindCategoryAdminInputs();
+}
+
+function onAction(e){
+  const action = e.currentTarget.dataset.action;
+  const p = currentProject();
+  switch(action){
+    case 'new-project': {
+      const draft = newProjectDraft();
+      db.projects.push(draft);
+      db.currentProjectId = draft.id;
+      saveDB(); render();
+      break;
+    }
+    case 'open-project': {
+      db.currentProjectId = e.currentTarget.dataset.id;
+      ui = {tab:'smeta', openCategoryId:null, showCategoryAdmin:false, purchaseFilterStatus:'ALL', purchaseFilterCategory:'ALL'};
+      saveDB(); render();
+      break;
+    }
+    case 'go-home': {
+      db.currentProjectId = null; saveDB(); render();
+      break;
+    }
+    case 'rename-project': {
+      const name = prompt('Новое название проекта:', p.name);
+      if(name && name.trim()){ p.name = name.trim(); saveDB(); render(); }
+      break;
+    }
+    case 'delete-draft': {
+      if(confirm('Удалить этот черновик проекта?')){
+        db.projects = db.projects.filter(x=>x.id!==p.id);
+        db.currentProjectId = null; saveDB(); render();
+      }
+      break;
+    }
+    case 'generate-estimate': {
+      applyEstimateToCategories(p);
+      p.stage = 'estimate';
+      saveDB(); render();
+      break;
+    }
+    case 'back-to-wizard': {
+      p.stage='wizard'; saveDB(); render();
+      break;
+    }
+    case 'start-work': {
+      p.stage='work'; ui.tab='smeta'; saveDB(); render();
+      break;
+    }
+    case 'set-tab': {
+      ui.tab = e.currentTarget.dataset.tab; render();
+      break;
+    }
+    case 'toggle-cat-admin': {
+      ui.showCategoryAdmin = !ui.showCategoryAdmin; render();
+      break;
+    }
+    case 'toggle-category': {
+      const id = e.currentTarget.dataset.id;
+      ui.openCategoryId = ui.openCategoryId===id ? null : id;
+      render();
+      break;
+    }
+    case 'cat-up': moveCategory(p, e.currentTarget.dataset.id, -1); break;
+    case 'cat-down': moveCategory(p, e.currentTarget.dataset.id, 1); break;
+    case 'cat-toggle-enabled': {
+      const cat = p.categories.find(c=>c.id===e.currentTarget.dataset.id);
+      cat.isEnabled = !cat.isEnabled; saveDB(); render();
+      break;
+    }
+    case 'add-category': {
+      const input = document.getElementById('new-cat-name');
+      const name = input.value.trim();
+      if(!name){ toast('Введите название категории'); return; }
+      const maxOrder = Math.max(-1, ...p.categories.map(c=>c.order));
+      p.categories.push({
+        id: uid('cat'), key:'custom_'+uid('k'), name, order:maxOrder+1,
+        color: CATEGORY_PALETTE[p.categories.length % CATEGORY_PALETTE.length],
+        type:'manual', plannedBudget:0, approvedBudget:0, actualBudget:0, note:'', isEnabled:true
+      });
+      saveDB(); render();
+      break;
+    }
+    case 'add-line-item': {
+      const catId = e.currentTarget.dataset.cat;
+      p.lineItems.push({
+        id: uid('li'), categoryId: catId, name:'', unit:'шт',
+        quantityPlanned:1, quantityActual:0,
+        priceEstimated:0, priceActual:0,
+        status:'NEED_TO_DECIDE', notes:'', isInventoryItem:false
+      });
+      ui.openCategoryId = catId;
+      saveDB(); render();
+      break;
+    }
+    case 'delete-line-item': {
+      const id = e.currentTarget.dataset.id;
+      if(confirm('Удалить позицию сметы?')){
+        p.lineItems = p.lineItems.filter(li=>li.id!==id);
+        saveDB(); render();
+      }
+      break;
+    }
+    case 'do-realloc': {
+      const fromId = document.getElementById('realloc-from').value;
+      const toId = document.getElementById('realloc-to').value;
+      const amount = Number(document.getElementById('realloc-amount').value)||0;
+      const note = document.getElementById('realloc-note').value;
+      if(fromId===toId){ toast('Выберите разные категории'); return; }
+      if(amount<=0){ toast('Введите сумму больше нуля'); return; }
+      const fromCat = catById(p, fromId), toCat = catById(p, toId);
+      if(fromCat.plannedBudget < amount){ if(!confirm('Сумма превышает плановый бюджет исходной категории. Продолжить?')) return; }
+      fromCat.plannedBudget -= amount;
+      toCat.plannedBudget += amount;
+      p.reallocationHistory.push({id:uid('re'), date:Date.now(), fromCategoryId:fromId, toCategoryId:toId, fromName:fromCat.name, toName:toCat.name, amount, note});
+      saveDB(); render();
+      break;
+    }
+    case 'enable-personal-mode': {
+      p.mode = 'PERSONAL'; saveDB(); render();
+      break;
+    }
+    case 'add-stock': {
+      const name = document.getElementById('new-stock-name').value.trim();
+      const qty = Number(document.getElementById('new-stock-qty').value)||0;
+      if(!name){ toast('Введите название материала'); return; }
+      const existing = findStock(p,name);
+      if(existing){ existing.quantity = (Number(existing.quantity)||0) + qty; }
+      else { p.stock.push({id:uid('st'), materialName:name, quantity:qty}); }
+      saveDB(); render();
+      break;
+    }
+    case 'stock-adjust': {
+      const id = e.currentTarget.dataset.id;
+      const delta = Number(e.currentTarget.dataset.delta);
+      const s = p.stock.find(x=>x.id===id);
+      s.quantity = Math.max(0, (Number(s.quantity)||0) + delta);
+      saveDB(); render();
+      break;
+    }
+    case 'stock-delete': {
+      p.stock = p.stock.filter(x=>x.id!==e.currentTarget.dataset.id);
+      saveDB(); render();
+      break;
+    }
+    case 'export-full-csv': exportFullCSV(p); break;
+    case 'export-full-xlsx': exportFullXLSX(p); break;
+    case 'export-purchase-list': exportPurchaseList(p); break;
+    case 'export-filtered-csv': exportFilteredCSV(p); break;
+  }
+}
+
+function moveCategory(p, id, dir){
+  const cats = p.categories.slice().sort((a,b)=>a.order-b.order);
+  const idx = cats.findIndex(c=>c.id===id);
+  const swapIdx = idx+dir;
+  if(swapIdx<0 || swapIdx>=cats.length) return;
+  const tmp = cats[idx].order;
+  cats[idx].order = cats[swapIdx].order;
+  cats[swapIdx].order = tmp;
+  saveDB(); render();
+}
+
+function bindWizardInputs(){
+  const nameEl = document.getElementById('w-name');
+  if(!nameEl) return;
+  const p = currentProject();
+  nameEl.addEventListener('input', e=>{ p.name = e.target.value; saveDB(); });
+  document.getElementById('w-projType').addEventListener('change', e=>{ p.projType = e.target.value; saveDB(); });
+  document.getElementById('w-days').addEventListener('input', e=>{ p.days = Number(e.target.value)||1; saveDB(); });
+  document.getElementById('w-stations').addEventListener('input', e=>{ p.stations = Number(e.target.value)||1; saveDB(); });
+  document.getElementById('w-kits').addEventListener('input', e=>{ p.onSetKits = Number(e.target.value)||0; saveDB(); });
+  document.getElementById('w-mode').addEventListener('change', e=>{ p.mode = e.target.value; saveDB(); });
+  document.getElementById('w-contingency').addEventListener('input', e=>{ p.contingencyPercent = Number(e.target.value)||0; saveDB(); });
+
+  document.querySelectorAll('.yn-toggle').forEach(group=>{
+    const field = group.dataset.field;
+    group.querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        p[field] = btn.dataset.val;
+        saveDB(); render();
+      });
+    });
+  });
+}
+
+function bindEstimateInputs(){
+  document.querySelectorAll('.est-cat-name').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const p = currentProject();
+      const cat = catById(p, e.target.dataset.id);
+      cat.name = e.target.value;
+      saveDB();
+    });
+  });
+}
+
+function bindCategoryAdminInputs(){
+  document.querySelectorAll('.cat-rename').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const p = currentProject();
+      const cat = catById(p, e.target.dataset.id);
+      cat.name = e.target.value;
+      saveDB();
+    });
+  });
+}
+
+function bindBudgetInputs(){
+  document.querySelectorAll('.budget-field').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const p = currentProject();
+      const cat = catById(p, e.target.dataset.cat);
+      cat[e.target.dataset.field] = Number(e.target.value)||0;
+      saveDB(); render();
+    });
+  });
+  const contingencyInput = document.getElementById('contingency-input');
+  if(contingencyInput){
+    contingencyInput.addEventListener('change', e=>{
+      const p = currentProject();
+      p.contingencyPercent = Number(e.target.value)||0;
+      saveDB();
+      toast('Подушка обновлена. Пересчитайте рыбу бюджета при необходимости.');
+    });
+  }
+}
+
+function bindLineItemInputs(){
+  document.querySelectorAll('.li-field').forEach(inp=>{
+    inp.addEventListener(inp.tagName==='SELECT' ? 'change' : 'input', e=>{
+      const p = currentProject();
+      const row = e.target.closest('[data-li]');
+      if(!row) return;
+      const id = row.dataset.li;
+      const li = p.lineItems.find(x=>x.id===id);
+      if(!li) return;
+      const field = e.target.dataset.field;
+      if(field==='name') li.name = e.target.value;
+      else if(field==='status') li.status = e.target.value;
+      else li[field] = Number(e.target.value)||0;
+      saveDB();
+      if(field==='status'){ render(); }
+    });
+  });
+}
+
+function bindPurchaseInputs(){
+  const s = document.getElementById('pf-status');
+  const c = document.getElementById('pf-category');
+  if(s) s.addEventListener('change', e=>{ ui.purchaseFilterStatus=e.target.value; render(); });
+  if(c) c.addEventListener('change', e=>{ ui.purchaseFilterCategory=e.target.value; render(); });
+}
+
+/* ---------- init ---------- */
+render();
+</script>
+</body>
+</html>
