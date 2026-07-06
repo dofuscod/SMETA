@@ -1,0 +1,221 @@
+// ==========================================
+// 1. ТИПЫ ДАННЫХ И ИНТЕРФЕЙСЫ (Data Structures)
+// ==========================================
+
+/**
+ * Доступные типы правил расчета расхода материалов.
+ * Легко расширяется добавлением новых вариантов.
+ */
+export type ConsumptionRuleType = 'per_x_shifts' | 'per_actor_per_shift' | 'fixed';
+
+/**
+ * Глобальный справочник материалов (Склад / Каталог)
+ */
+export interface Material {
+  id: string;
+  name: string;
+  unit: string;       // например: 'пачка', 'шт', 'мл'
+  basePrice: number;   // базовая цена за единицу
+}
+
+/**
+ * Элемент шаблона закупок.
+ * Описывает не жесткое количество, а правило, по которому это количество нужно рассчитать.
+ */
+export interface TemplateItem {
+  materialId: string;
+  consumptionRule: ConsumptionRuleType;
+  ruleValue: number;   // X в правиле (например, каждые "2" смены или "3" актера)
+  baseQuantity: number; // Сколько единиц материала нужно на один шаг правила
+}
+
+/**
+ * Конфигурация шаблона
+ */
+export interface PurchaseTemplate {
+  id: string;
+  name: string;
+  items: TemplateItem[];
+}
+
+/**
+ * Динамический контекст проекта, влияющий на расчеты
+ */
+export interface ProjectContext {
+  id: string;
+  name: string;
+  shiftsCount: number;  // Количество смен
+  actorsCount: number;  // Количество актеров/персонажей
+}
+
+/**
+ * Финальный элемент Списка Покупок в конкретном проекте.
+ * Реализует принцип "User Ownership" (Разделение расчетного и реального количества).
+ */
+export interface ProjectPurchaseItem {
+  id: string;
+  projectId: string;
+  materialId: string;
+  calculatedQuantity: number; // То, что рассчитала система автоматически
+  actualQuantity: number;     // То, что пойдет в закупку (может быть изменено юзером)
+  isManuallyEdited: boolean;  // Флаг: редактировал ли пользователь строку вручную
+}
+
+
+// ==========================================
+// 2. ДВИЖОК РАСЧЕТА (Calculation Engine)
+// ==========================================
+
+export class PurchaseCalculationEngine {
+  
+  /**
+   * Чистая функция для расчета автоматического количества на основе правила
+   */
+  private static calculateQuantity(rule: ConsumptionRuleType, ruleValue: number, baseQty: number, project: ProjectContext): number {
+    switch (rule) {
+      case 'per_x_shifts':
+        // Формула: Округление_Вверх(Всего_Смен / Шаг_Смен) * Базовое_Кол-во
+        return Math.ceil(project.shiftsCount / ruleValue) * baseQty;
+        
+      case 'per_actor_per_shift':
+        // Формула: Кол-во_Актеров * Кол-во_Смен * Базовое_Кол-во (делитель ruleValue для масштабирования)
+        return Math.ceil((project.actorsCount * project.shiftsCount) / ruleValue) * baseQty;
+        
+      case 'fixed':
+        // Фиксированное количество на проект, не зависит от параметров таймлайна
+        return baseQty;
+        
+      default:
+        // Если правило не распознано, возвращаем базовое количество ради стабильности
+        return baseQty;
+    }
+  }
+
+  /**
+   * Генерация нового списка покупок для проекта на основе шаблона
+   */
+  public static generatePurchaseList(project: ProjectContext, template: PurchaseTemplate): Omit<ProjectPurchaseItem, 'id'>[] {
+    return template.items.map((item) => {
+      const calculated = this.calculateQuantity(
+        item.consumptionRule, 
+        item.ruleValue, 
+        item.baseQuantity, 
+        project
+      );
+
+      return {
+        projectId: project.id,
+        materialId: item.materialId,
+        calculatedQuantity: calculated,
+        actualQuantity: calculated, // По умолчанию совпадает с расчетным
+        isManuallyEdited: false,     // Изначально создано системой
+      };
+    });
+  }
+
+  /**
+   * Пересчет существующего списка покупок при изменении параметров проекта (например, выросло число смен).
+   * Метод строго оберегает данные, измененные пользователем вручную.
+   */
+  public static recalculateExistingList(
+    currentItems: ProjectPurchaseItem[],
+    project: ProjectContext,
+    template: PurchaseTemplate
+  ): ProjectPurchaseItem[] {
+    return currentItems.map((currentItem) => {
+      // Ищем правило для этого материала в шаблоне
+      const templateItem = template.items.find(t => t.materialId === currentItem.materialId);
+      
+      if (!templateItem) return currentItem; // Если материала уже нет в шаблоне, оставляем как есть
+
+      // Считаем новое актуальное значение на основе изменившегося проекта
+      const newCalculated = this.calculateQuantity(
+        templateItem.consumptionRule,
+        templateItem.ruleValue,
+        templateItem.baseQuantity,
+        project
+      );
+
+      return {
+        ...currentItem,
+        calculatedQuantity: newCalculated,
+        // Если пользователь правил руками — сохраняем его значение. Если нет — обновляем авторасчетом.
+        actualQuantity: currentItem.isManuallyEdited ? currentItem.actualQuantity : newCalculated
+      };
+    });
+  }
+}
+
+
+// ==========================================
+// 3. ДЕМОНСТРАЦИЯ РАБОТЫ (Тестовый сценарий)
+// ==========================================
+
+// 1. Создаем глобальный каталог материалов
+const mockMaterials: Material[] = [
+  { id: 'm-1', name: 'Ватные диски (пачка 100шт)', unit: 'пачка', basePrice: 150 },
+  { id: 'm-2', name: 'Влажные салфетки XL', unit: 'пачка', basePrice: 200 },
+  { id: 'm-3', name: 'Тональный крем HD', unit: 'шт', basePrice: 3500 }
+];
+
+// 2. Создаем шаблон "Расходники Базовый"
+const basicConsumablesTemplate: PurchaseTemplate = {
+  id: 'tmpl-basic',
+  name: 'Расходники Базовый',
+  items: [
+    {
+      materialId: 'm-1', 
+      consumptionRule: 'per_x_shifts', 
+      ruleValue: 2, // Раз в 2 смены
+      baseQuantity: 1 // 1 пачка
+    },
+    {
+      materialId: 'm-3',
+      consumptionRule: 'per_actor_per_shift',
+      ruleValue: 5, // 1 тюбик хватает на 5 человеко-смен
+      baseQuantity: 1
+    }
+  ]
+};
+
+// 3. Инициализируем проект (10 смен, 3 актера)
+let movieProject: ProjectContext = {
+  id: 'proj-horror-2026',
+  name: 'Фильм Ужасов "Смена"',
+  shiftsCount: 10,
+  actorsCount: 3
+};
+
+console.log('--- Шаг 1: Первичная генерация списка покупок на 10 смен ---');
+let purchaseList = PurchaseCalculationEngine.generatePurchaseList(movieProject, basicConsumablesTemplate) as ProjectPurchaseItem[];
+console.log(purchaseList);
+/* 
+  Ожидаемый результат: 
+  - Ватные диски: 10 / 2 = 5 пачек
+  - Тональный крем: (3 актера * 10 смен) / 5 = 6 шт
+*/
+
+console.log('\n--- Шаг 2: Пользователь вручную корректирует количество ватных дисков ---');
+// Пользователь заходит в интерфейс и меняет количество ватных дисков с 5 на 7, зная, что будет много крови
+purchaseList = purchaseList.map(item => {
+  if (item.materialId === 'm-1') {
+    return { ...item, actualQuantity: 7, isManuallyEdited: true };
+  }
+  return item;
+});
+console.log(purchaseList);
+
+console.log('\n--- Шаг 3: Продюсер сообщает, что смен теперь 14 (Пересчет) ---');
+movieProject.shiftsCount = 14;
+
+let updatedPurchaseList = PurchaseCalculationEngine.recalculateExistingList(
+  purchaseList,
+  movieProject,
+  basicConsumablesTemplate
+);
+console.log(updatedPurchaseList);
+/* 
+  Ожидаемый результат:
+  - Ватные диски: расчетное стало 7 (14/2), но actualQuantity ОСТАЛОСЬ 7 (так как изменены вручную).
+  - Тональный крем: расчетное и актуальное пересчиталось на 9 шт ((3 * 14) / 5 = 8.4 -> округление до 9).
+*/
